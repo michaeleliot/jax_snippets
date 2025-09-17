@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 # import numpy as np
+import time
 
 num_points = 200
 spread = 2.5 # Standard deviation of the normal distribution
@@ -34,6 +35,7 @@ def randn_mu_sigma(mu=0, sigma=1):
 x_values = [rand_range(-10, 10) for i in range(num_points)]
 y_values = [x_values[i] + randn_mu_sigma(0, spread) for i in range(num_points)]
 
+start = time.perf_counter()
 x_sum = sum(x_values)
 y_sum = sum(y_values)
 sum_of_x_squared = sum([x_values[i] * x_values[i] for i in range(num_points)])
@@ -44,7 +46,10 @@ b = (y_sum * sum_of_x_squared - x_sum * sum_of_x_times_y) / ((num_points * sum_o
 m = ((num_points * sum_of_x_times_y) - (x_sum * y_sum)) / ((num_points * sum_of_x_squared) - (x_sum * x_sum))
 
 y_line = [m * x_values[i] + b for i in range(len(x_values))]
+finish = time.perf_counter()
+print(f"Linear Regression Formula {finish - start:0.4f} seconds")
 
+start = time.perf_counter()
 [m2, b2] = [rand_range(-10, 10) for i in range(2)]
 
 for _ in range(1000):
@@ -59,6 +64,8 @@ for _ in range(1000):
   b2 = b2 - (alpha * changeInB)
 
 y2_line = [m2 * x_values[i] + b2 for i in range(num_points)]
+finish = time.perf_counter()
+print(f"Manual Gradient Descent {finish - start:0.4f} seconds")
 
 plt.subplot(1, 3, 1)
 
@@ -75,6 +82,7 @@ import numpy as np
 x_values_np = np.random.uniform(-10, 10, num_points)
 y_values_np = x_values_np + np.random.uniform(0, spread, num_points)
 
+start = time.perf_counter()
 [m_np, b_np] = np.random.uniform(0, 1, size=2)
 
 for _ in range(1000):
@@ -89,9 +97,14 @@ for _ in range(1000):
   b_np = b_np - (alpha * changeInB)
 
 y_np_line = m_np * x_values_np + b_np
+finish = time.perf_counter()
+print(f"Numpy Gradient Descent {finish - start:0.4f} seconds")
 
+start = time.perf_counter()
 m_poly, b_poly = np.polyfit(x_values_np, y_values_np, 1)
 y_np_poly_line = m_poly * x_values_np + b_poly
+finish = time.perf_counter()
+print(f"Numpy Poly Fit {finish - start:0.4f} seconds")
 
 plt.subplot(1, 3, 2)
 
@@ -112,6 +125,7 @@ key, subkey1, subkey2, subkey3 = jax.random.split(key, 4)
 x_values_jnp = jax.random.uniform(subkey1, shape=(num_points,), minval=-10, maxval=10)
 y_values_jnp = x_values_jnp + jax.random.uniform(subkey2, shape=(num_points,), minval=0, maxval=spread)
 
+start = time.perf_counter()
 m_jnp, b_jnp = jax.random.uniform(subkey3, shape=(2,), minval=0.0, maxval=1.0)
 
 # gradient descent loop
@@ -127,7 +141,10 @@ for _ in range(1000):
     b_jnp = b_jnp - alpha * changeInB_jnp
 
 y_line_jnp = m_jnp * x_values_jnp + b_jnp
+finish = time.perf_counter()
+print(f"Jax Gradient Descent {finish - start:0.4f} seconds")
 
+start = time.perf_counter()
 ones_jnp = jnp.ones((x_values_jnp.shape[0], 1))
 X_jnp = jnp.hstack((ones_jnp, x_values_jnp.reshape(-1, 1)))  # shape (n, 2)
 
@@ -136,6 +153,8 @@ beta_jnp, residuals, rank, s = jnp.linalg.lstsq(X_jnp, y_values_jnp, rcond=None)
 
 # predictions
 y_lstsq_jnp = X_jnp @ beta_jnp
+finish = time.perf_counter()
+print(f"Jax lstsq {finish - start:0.4f} seconds")
 
 plt.subplot(1, 3, 3)
 plt.plot(x_values_jnp, y_values_jnp, 'ro')
