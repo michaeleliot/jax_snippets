@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 # import numpy as np
 import time
+from jax import make_jaxpr
 
 num_points = 200
 spread = 2.5 # Standard deviation of the normal distribution
@@ -115,7 +116,7 @@ plt.legend()
 
 import jax
 import jax.numpy as jnp
-
+from jax import jit
 
 # key for randomness
 key = jax.random.PRNGKey(0)
@@ -125,34 +126,68 @@ key, subkey1, subkey2, subkey3 = jax.random.split(key, 4)
 x_values_jnp = jax.random.uniform(subkey1, shape=(num_points,), minval=-10, maxval=10)
 y_values_jnp = x_values_jnp + jax.random.uniform(subkey2, shape=(num_points,), minval=0, maxval=spread)
 
+# Following is very slow
+def jax_manual_gradient_descent_slow(x_values_jnp, y_values_jnp, num_points, subkey3):
+    m_jnp, b_jnp = jax.random.uniform(subkey3, shape=(2,), minval=0.0, maxval=1.0)
+
+    # gradient descent loop
+    alpha = 0.001
+    for _ in range(1000):
+        y_estimates_jnp = m_jnp * x_values_jnp + b_jnp
+        error_jnp = y_values_jnp - y_estimates_jnp
+
+        changeInM_jnp = jnp.sum((-2 / num_points) * (x_values_jnp * error_jnp))
+        changeInB_jnp = jnp.sum((-2 / num_points) * error_jnp)
+
+        m_jnp = m_jnp - alpha * changeInM_jnp
+        b_jnp = b_jnp - alpha * changeInB_jnp
+
+    y_line_jnp = m_jnp * x_values_jnp + b_jnp
+    return y_line_jnp
+
+def jax_manual_gradient_descent(x_values_jnp, y_values_jnp, num_points, subkey3):
+    m_jnp, b_jnp = jax.random.uniform(subkey3, shape=(2,), minval=0.0, maxval=1.0)
+    alpha = 0.001
+    iterations = 1000
+
+    def step(i, params):
+        m, b = params
+        y_estimates = m * x_values_jnp + b
+        error = y_values_jnp - y_estimates
+
+        changeInM = jnp.sum((-2 / num_points) * (x_values_jnp * error))
+        changeInB = jnp.sum((-2 / num_points) * error)
+
+        m = m - alpha * changeInM
+        b = b - alpha * changeInB
+        return m, b
+
+    m_jnp, b_jnp = jax.lax.fori_loop(0, iterations, step, (m_jnp, b_jnp))
+    y_line_jnp = m_jnp * x_values_jnp + b_jnp
+    return y_line_jnp
+
+jax_manual_gradient_descent_compiled = jit(jax_manual_gradient_descent)
+
 start = time.perf_counter()
-m_jnp, b_jnp = jax.random.uniform(subkey3, shape=(2,), minval=0.0, maxval=1.0)
-
-# gradient descent loop
-alpha = 0.001
-for _ in range(1000):
-    y_estimates_jnp = m_jnp * x_values_jnp + b_jnp
-    error_jnp = y_values_jnp - y_estimates_jnp
-
-    changeInM_jnp = jnp.sum((-2 / num_points) * (x_values_jnp * error_jnp))
-    changeInB_jnp = jnp.sum((-2 / num_points) * error_jnp)
-
-    m_jnp = m_jnp - alpha * changeInM_jnp
-    b_jnp = b_jnp - alpha * changeInB_jnp
-
-y_line_jnp = m_jnp * x_values_jnp + b_jnp
+y_line_jnp = jax_manual_gradient_descent_compiled(x_values_jnp, y_values_jnp, num_points, subkey3)
 finish = time.perf_counter()
 print(f"Jax Gradient Descent {finish - start:0.4f} seconds")
 
 start = time.perf_counter()
-ones_jnp = jnp.ones((x_values_jnp.shape[0], 1))
-X_jnp = jnp.hstack((ones_jnp, x_values_jnp.reshape(-1, 1)))  # shape (n, 2)
+def jax_lstsq():
+    ones_jnp = jnp.ones((x_values_jnp.shape[0], 1))
+    X_jnp = jnp.hstack((ones_jnp, x_values_jnp.reshape(-1, 1)))  # shape (n, 2)
 
-# solve least squares
-beta_jnp, residuals, rank, s = jnp.linalg.lstsq(X_jnp, y_values_jnp, rcond=None)
+    # solve least squares
+    beta_jnp, residuals, rank, s = jnp.linalg.lstsq(X_jnp, y_values_jnp, rcond=None)
+
+    # predictions
+    y_lstsq_jnp = X_jnp @ beta_jnp
+    return y_lstsq_jnp
 
 # predictions
-y_lstsq_jnp = X_jnp @ beta_jnp
+jax_lstsq_compiled = jit(jax_lstsq)
+y_lstsq_jnp = jax_lstsq_compiled()
 finish = time.perf_counter()
 print(f"Jax lstsq {finish - start:0.4f} seconds")
 
